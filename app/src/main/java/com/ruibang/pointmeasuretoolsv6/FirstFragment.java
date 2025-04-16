@@ -20,25 +20,27 @@ public class FirstFragment extends Fragment {
             @NonNull LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState
     ) {
-
+        // 使用数据绑定库来创建视图
         binding = FragmentFirstBinding.inflate(inflater, container, false);
         return binding.getRoot();
-
     }
 
     public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        binding.buttonFirst.setOnClickListener(v ->
-                NavHostFragment.findNavController(FirstFragment.this)
-                        .navigate(R.id.action_FirstFragment_to_SecondFragment)
-        );
+        // 确保按钮和导航配置正确
+        if (binding != null && binding.buttonFirst != null) {
+            binding.buttonFirst.setOnClickListener(v ->
+                    NavHostFragment.findNavController(FirstFragment.this)
+                            .navigate(R.id.action_FirstFragment_to_SecondFragment)
+            );
+        }
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        // 清除绑定，防止内存泄漏
         binding = null;
     }
-
 }
