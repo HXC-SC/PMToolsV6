@@ -42,7 +42,7 @@
             android:id="@+id/pdfOperationHint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="双指缩放，左右滑动翻页"
+            android:text="双指缩放,左右滑动翻页"
             android:textSize="14sp"
             android:padding="8dp"
             android:background="@android:color/darker_gray"
