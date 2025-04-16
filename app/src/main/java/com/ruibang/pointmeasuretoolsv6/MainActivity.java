@@ -59,44 +59,31 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // 使用数据绑定库来创建视图
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-//        setSupportActionBar(binding.toolbar);
-//
-//        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
-//        appBarConfiguration = new AppBarConfiguration.Builder(navController.getGraph()).build();
-//        NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
-//
-//        binding.fab.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                        .setAnchorView(R.id.fab)
-//                        .setAction("Action", null).show();
-//            }
-//        });
+        // 确保导航控制器正确初始化
+        View navHostFragment = findViewById(R.id.nav_host_fragment_content_main);
+        if (navHostFragment != null) {
+            NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
+            appBarConfiguration = new AppBarConfiguration.Builder(navController.getGraph()).build();
+            NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
+        } else {
+            Toast.makeText(this, "导航宿主视图未找到", Toast.LENGTH_SHORT).show();
+        }
 
-//        pdfListView = findViewById(R.id.pdfListView);
-//        pdfView = findViewById(R.id.pdfView);
-//
-//        if (ContextCompat.checkSelfPermission(this,  android.Manifest.permission.READ_EXTERNAL_STORAGE)
-//                != PackageManager.PERMISSION_GRANTED) {
-//            ActivityCompat.requestPermissions(this,
-//                    new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},
-//                    PERMISSION_REQUEST_CODE);
-//        } else {
-//            loadPDFs();
-//        }
-
+        // 初始化PDF列表视图和PDF视图
         pdfListView = findViewById(R.id.pdfListView);
         pdfView = findViewById(R.id.pdfView);
         pdfOperationHint = findViewById(R.id.pdfOperationHint);
 
+        // 初始化进度对话框
         progressDialog = new ProgressDialog(this);
         progressDialog.setMessage(" 正在加载PDF文件...");
         progressDialog.setCancelable(false);
 
+        // 检查并请求读取外部存储的权限
         if (ContextCompat.checkSelfPermission(this,  android.Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -106,8 +93,8 @@ public class MainActivity extends AppCompatActivity {
             loadPDFs();
         }
 
+        // 初始化返回列表按钮并设置点击事件
         backToListButton = findViewById(R.id.backToListButton);
-
         backToListButton.setOnClickListener(new  View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -121,19 +108,16 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
+        // 加载菜单资源
         getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
+        // 处理菜单项点击事件
         int id = item.getItemId();
 
-        //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             return true;
         }
@@ -143,6 +127,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onSupportNavigateUp() {
+        // 处理导航返回事件
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         return NavigationUI.navigateUp(navController, appBarConfiguration)
                 || super.onSupportNavigateUp();
@@ -152,6 +137,7 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode,  permissions, grantResults);
+        // 处理权限请求结果
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length  > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 loadPDFs();
@@ -162,6 +148,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadPDFs() {
+        // 加载PDF文件列表
         pdfFiles = new ArrayList<>();
         File externalStorageDirectory = Environment.getExternalStorageDirectory();
         findPDFs(externalStorageDirectory);
@@ -169,18 +156,18 @@ public class MainActivity extends AppCompatActivity {
         List<Map<String, Object>> data = new ArrayList<>();
         for (File file : pdfFiles) {
             Map<String, Object> item = new HashMap<>();
-            //缺少图标
-//            item.put("pdfIcon",  R.drawable.pdf_icon);
             item.put("pdfFileName",  file.getName());
             data.add(item);
         }
 
+        // 设置PDF列表适配器
         SimpleAdapter adapter = new SimpleAdapter(this, data,
                 R.layout.list_item_pdf,
                 new String[]{"pdfIcon", "pdfFileName"},
                 new int[]{R.id.pdfIcon,  R.id.pdfFileName});
         pdfListView.setAdapter(adapter);
 
+        // 设置PDF列表项点击事件
         pdfListView.setOnItemClickListener(new  AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -191,6 +178,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void findPDFs(File directory) {
+        // 递归查找PDF文件
         File[] files = directory.listFiles();
         if (files != null) {
             for (File file : files) {
@@ -204,6 +192,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showPDF(File file) {
+        // 显示选中的PDF文件
         progressDialog.show();
         pdfListView.setVisibility(View.GONE);
         pdfView.setVisibility(View.VISIBLE);
