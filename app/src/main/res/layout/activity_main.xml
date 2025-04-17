@@ -7,70 +7,90 @@
     android:fitsSystemWindows="true"
     tools:context=".MainActivity">
 
-    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <ListView
-            android:id="@+id/pdfListView"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="3">
-
-            <com.github.barteksc.pdfviewer.PDFView
-                android:id="@+id/pdfView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/backToListButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="返回列表"
-                android:layout_margin="16dp"
-                android:visibility="gone"/>
-        </RelativeLayout>
-
-        <TextView
-            android:id="@+id/pdfOperationHint"
+        <!-- 顶部栏 -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="双指缩放，左右滑动翻页"
-            android:textSize="14sp"
+            android:orientation="horizontal"
             android:padding="8dp"
-            android:background="@android:color/darker_gray"
-            android:textColor="@android:color/white"
-            android:visibility="gone"/>
+            android:background="@android:color/darker_gray">
+
+            <TextView
+                android:id="@+id/titleTextView"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="文件列表"
+                android:textSize="18sp"
+                android:textColor="@android:color/white"/>
+
+            <Button
+                android:id="@+id/searchButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="搜索"/>
+
+            <Button
+                android:id="@+id/editButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="编辑"/>
+        </LinearLayout>
+
+        <!-- 中间内容区域 -->
+        <FrameLayout
+            android:id="@+id/contentFrame"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/pdfOperationHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PDF操作提示"
+                android:visibility="gone"
+                android:layout_gravity="center"
+                android:textSize="16sp"
+                android:textColor="@android:color/black"/>
+
+            <ListView
+                android:id="@+id/pdfListView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="visible"/>
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <com.github.barteksc.pdfviewer.PDFView
+                    android:id="@+id/pdfView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone"/>
+
+                <Button
+                    android:id="@+id/backToListButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="返回列表"
+                    android:layout_margin="16dp"
+                    android:visibility="gone"/>
+            </RelativeLayout>
+        </FrameLayout>
+
+        <!-- 底部导航栏 -->
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottomNavigationView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:menu="@menu/bottom_nav_menu"/>
     </LinearLayout>
-
-    <!--    <com.google.android.material.appbar.AppBarLayout-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:fitsSystemWindows="true">-->
-
-<!--        <com.google.android.material.appbar.MaterialToolbar-->
-<!--            android:id="@+id/toolbar"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="?attr/actionBarSize" />-->
-
-<!--    </com.google.android.material.appbar.AppBarLayout>-->
-
-<!--    <include layout="@layout/content_main" />-->
-
-<!--    <com.google.android.material.floatingactionbutton.FloatingActionButton-->
-<!--        android:id="@+id/fab"-->
-<!--        android:layout_width="wrap_content"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:layout_gravity="bottom|end"-->
-<!--        android:layout_marginEnd="@dimen/fab_margin"-->
-<!--        android:layout_marginBottom="16dp"-->
-<!--        app:srcCompat="@android:drawable/ic_dialog_email" />-->
-
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
