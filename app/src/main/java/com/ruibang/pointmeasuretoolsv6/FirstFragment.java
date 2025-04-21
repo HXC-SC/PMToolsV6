@@ -2,14 +2,24 @@ package com.ruibang.pointmeasuretoolsv6;
 
 import android.Manifest;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.PointF;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.GestureDetector;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -33,6 +43,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.text.DecimalFormat;
+
+
 
 public class FirstFragment extends Fragment {
 
@@ -45,12 +58,21 @@ public class FirstFragment extends Fragment {
     private static final int PERMISSION_REQUEST_CODE = 1;
     // 权限请求码
     private static final int REQUEST_CODE_READ_STORAGE = 100;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 101;
+
+    private static float mPageWidth;    // 页面宽度
+    private static float mPageHeight;   // 页面高度
+    private static float mScaleFactor;  // 缩放因子
+
+    private LocationManager locationManager;
+    private static final long MIN_TIME_BW_UPDATES = 1000;
+    private static final float MIN_DISTANCE_CHANGE_FOR_UPDATES = 1;
 
     @Override
     public View onCreateView(
             @NonNull LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState
-    ) {
+            Bundle savedInstanceState)
+    {
         // 初始化进度对话框
         progressDialog = new ProgressDialog(requireContext());
         progressDialog.setMessage(" 正在加载PDF文件...");
@@ -66,7 +88,9 @@ public class FirstFragment extends Fragment {
         // 初始化PDF视图
         pdfView = rootView.findViewById(R.id.pdfView);
 
-        checkReadStoragePermission();
+        //检查权限
+        checkReadStoragePermission();//读取外部存储权限
+        checkLocationPermission();  //定位权限位置权限
         // 检查并请求读取外部存储的权限
 //        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_EXTERNAL_STORAGE)
 //                != PackageManager.PERMISSION_GRANTED) {
@@ -93,27 +117,17 @@ public class FirstFragment extends Fragment {
                 }
             }
         });
-        // 设置PDF列表项点击事件
-//        pdfListView.setOnItemClickListener((parent, view, position, id) -> {
-//            // 高亮选中的行
-//            for (int i = 0; i < parent.getChildCount(); i++) {
-//                parent.getChildAt(i).setBackgroundColor(Color.TRANSPARENT);
-//            }
-//            view.setBackgroundColor(Color.LTGRAY);
-//
-//            File selectedFile = pdfFiles.get(position);
-//            showPDF(selectedFile);
-//        });
+
 
         // 设置PDF列表项长按事件
-        pdfListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override
-            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                File selectedFile = pdfFiles.get(position);
-                showFileInfoDialog(selectedFile);
-                return true;
-            }
-        });
+//        pdfListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+//            @Override
+//            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+//                File selectedFile = pdfFiles.get(position);
+//                showFileInfoDialog(selectedFile);
+//                return true;
+//            }
+//        });
 
         return rootView;
     }
@@ -210,6 +224,24 @@ public class FirstFragment extends Fragment {
                 Toast.makeText(requireContext(), "权限被拒绝，无法读取文件", Toast.LENGTH_SHORT).show();
             }
         }
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // 权限已授予，可以进行定位操作
+            } else {
+                Toast.makeText(requireContext(), "定位权限被拒绝", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                    LOCATION_PERMISSION_REQUEST_CODE);
+        }
     }
 
     @Override
@@ -241,6 +273,12 @@ public class FirstFragment extends Fragment {
                     .enableSwipe(true)
                     .swipeHorizontal(false)
                     .enableAnnotationRendering(true)
+                    .onDraw((canvas, pageWidth, pageHeight, displayedPage) -> {
+                        // 保存页面尺寸和缩放比例
+                        mPageWidth = pageWidth;
+                        mPageHeight = pageHeight;
+                        mScaleFactor = canvas.getWidth() / pageWidth; // 假设水平方向铺满
+                    })
 //                    .password(null) // 若有密码，设置正确密码
 //                    .scrollHandle(null) // 可根据需要设置滚动处理
 //                    .enableAntialiasing(true) // 启用抗锯齿
@@ -260,11 +298,110 @@ public class FirstFragment extends Fragment {
                         Log.e("FirstFragment", "PDF 文件加载出错: " + throwable.getMessage());
                     })
                     .load();
+
+            // 创建 GestureDetector 来处理长按事件
+            GestureDetector gestureDetector = new GestureDetector(requireContext(), new GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public void onLongPress(MotionEvent e) {
+                    float x = e.getX();
+                    float y = e.getY();
+                    PointF pdfCoordinates = convertToPdfCoordinates(x, y);
+                    showPositionDialog(pdfCoordinates);
+                }
+            });
+
+
+
+            // 确保触摸事件能传递到长按监听器
+            pdfView.setOnTouchListener((v, event) -> {
+                // 返回 gestureDetector.onTouchEvent(event) 的结果，让其处理触摸事件
+                return gestureDetector.onTouchEvent(event);
+            });
+            // 添加长按监听器
+//            pdfView.setOnLongClickListener(new View.OnLongClickListener() {
+//                @Override
+//                public boolean onLongClick(View v) {
+//                    float x = v.getX();
+//                    float y = v.getY();
+//                    // 获取文档上的位置，这里简单假设屏幕位置和文档位置一致，实际可能需要转换
+//                    // 可根据 pdfView 的缩放、滚动等状态进行精确转换
+//                    showPositionDialog(x, y);
+//                    return true;
+//                }
+//            });
         } catch (Exception e) {
             // 捕获异常并关闭进度对话框
             progressDialog.dismiss();
             Log.e("FirstFragment", "显示 PDF 文件时出错: " + e.getMessage());
         }
+    }
+
+    private PointF convertToPdfCoordinates(float screenX, float screenY) {
+        // 计算相对于 PDF 页面的坐标
+        float pdfX = screenX / mScaleFactor;
+        float pdfY = (mPageHeight - (screenY / mScaleFactor)); // 翻转 Y 轴
+        return new PointF(pdfX, pdfY);
+    }
+    private void showPositionDialog(PointF pdfPoint) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("定位点信息");
+
+        // 加载布局
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_position_info, null);
+        builder.setView(dialogView);
+
+        // 初始化视图
+        EditText nameEditText = dialogView.findViewById(R.id.nameEditText);
+        Spinner typeSpinner = dialogView.findViewById(R.id.typeSpinner);
+        EditText latitudeEditText = dialogView.findViewById(R.id.latitudeEditText);
+        EditText longitudeEditText = dialogView.findViewById(R.id.longitudeEditText);
+        EditText pdfXEditText = dialogView.findViewById(R.id.pdfXEditText);
+        EditText pdfYEditText = dialogView.findViewById(R.id.pdfYEditText);
+
+        // 设置文件坐标
+        pdfXEditText.setText(String.valueOf(pdfPoint.x));
+        pdfYEditText.setText(String.valueOf(pdfPoint.y));
+
+        // 获取系统经纬度
+        locationManager = (LocationManager) requireActivity().getSystemService(Context.LOCATION_SERVICE);
+        try {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME_BW_UPDATES,
+                    MIN_DISTANCE_CHANGE_FOR_UPDATES, new LocationListener() {
+                        @Override
+                        public void onLocationChanged(Location location) {
+                            // 保留四位小数
+                            DecimalFormat df = new DecimalFormat("#.####");
+                            latitudeEditText.setText(df.format(location.getLatitude()));
+                            longitudeEditText.setText(df.format(location.getLongitude()));
+                            // 移除监听器，避免持续更新
+                            locationManager.removeUpdates(this);
+                        }
+
+                        @Override
+                        public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+                        @Override
+                        public void onProviderEnabled(String provider) {}
+
+                        @Override
+                        public void onProviderDisabled(String provider) {}
+                    });
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        }
+
+        // 设置对话框按钮
+        builder.setPositiveButton("确定", (dialog, which) -> {
+            // 处理保存逻辑
+            String name = nameEditText.getText().toString();
+            String type = (String) typeSpinner.getSelectedItem();
+            String latitude = latitudeEditText.getText().toString();
+            String longitude = longitudeEditText.getText().toString();
+            // 可以在这里添加保存数据的逻辑
+        });
+        builder.setNegativeButton("取消", (dialog, which) -> dialog.dismiss());
+
+        builder.create().show();
     }
 
     private void showFileInfoDialog(File file) {
@@ -289,5 +426,13 @@ public class FirstFragment extends Fragment {
         builder.setNegativeButton("取消", (dialog, which) -> dialog.dismiss());
 
         builder.create().show();
+    }
+    public void showFileList() {
+        pdfView.setVisibility(View.GONE);
+        backToListButton.setVisibility(View.GONE);
+        pdfListView.setVisibility(View.VISIBLE);
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).showBackButton(false);
+        }
     }
 }

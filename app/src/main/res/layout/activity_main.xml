@@ -18,7 +18,8 @@
             android:layout_height="?attr/actionBarSize"
             app:menu="@menu/top_appbar_menu"
             app:title="文件"
-            android:gravity="center"/>
+            android:gravity="center"
+            app:titleCentered="true"/>
         <ImageButton
             android:id="@+id/backButton"
             android:layout_width="wrap_content"
