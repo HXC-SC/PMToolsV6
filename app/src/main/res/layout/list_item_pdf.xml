@@ -9,20 +9,15 @@
         android:id="@+id/pdfIcon"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:src="@drawable/ic_pdf"/>
+        android:src="@drawable/ic_pdf" />
 
     <TextView
         android:id="@+id/pdfFileName"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="文件名"
+        android:text="PDF File Name"
         android:textSize="16sp"
-        android:paddingLeft="8dp"/>
-
-    <Button
-        android:id="@+id/moreButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="..."/>
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp" />
 </LinearLayout>

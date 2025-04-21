@@ -1,39 +1,214 @@
 package com.ruibang.pointmeasuretoolsv6;
 
+import android.Manifest;
+import android.app.ProgressDialog;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Environment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.SimpleAdapter;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.navigation.fragment.NavHostFragment;
 
+import com.github.barteksc.pdfviewer.PDFView;
+import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener;
 import com.ruibang.pointmeasuretoolsv6.databinding.FragmentFirstBinding;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class FirstFragment extends Fragment {
 
     private FragmentFirstBinding binding;
+    private Button backToListButton;
+    private ProgressDialog progressDialog;
+    private PDFView pdfView;
+    private ListView pdfListView;
+    private List<File> pdfFiles;
+    private static final int PERMISSION_REQUEST_CODE = 1;
+    // 权限请求码
+    private static final int REQUEST_CODE_READ_STORAGE = 100;
 
     @Override
     public View onCreateView(
             @NonNull LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState
     ) {
+        // 初始化进度对话框
+        progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage(" 正在加载PDF文件...");
+        progressDialog.setCancelable(false);
+
         // 使用数据绑定库来创建视图
         binding = FragmentFirstBinding.inflate(inflater, container, false);
-        return binding.getRoot();
+        View rootView = binding.getRoot();
+
+        // 初始化PDF列表视图
+        pdfListView = rootView.findViewById(R.id.pdfListView);
+
+        // 初始化PDF视图
+        pdfView = rootView.findViewById(R.id.pdfView);
+
+        checkReadStoragePermission();
+        // 检查并请求读取外部存储的权限
+//        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_EXTERNAL_STORAGE)
+//                != PackageManager.PERMISSION_GRANTED) {
+//            ActivityCompat.requestPermissions(requireActivity(),
+//                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+//                    PERMISSION_REQUEST_CODE);
+//        } else {
+//            loadPDFs();
+//        }
+
+        // 初始化返回列表按钮并设置点击事件
+        backToListButton = binding.backToListButton;
+        backToListButton.setOnClickListener(new  View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pdfView.setVisibility(View.GONE);
+                //pdfOperationHint.setVisibility(View.GONE);
+                backToListButton.setVisibility(View.GONE);
+                pdfListView.setVisibility(View.VISIBLE);
+
+                // 隐藏返回按钮
+                if (getActivity() instanceof MainActivity) {
+                    ((MainActivity) getActivity()).showBackButton(false);
+                }
+            }
+        });
+        // 设置PDF列表项点击事件
+//        pdfListView.setOnItemClickListener((parent, view, position, id) -> {
+//            // 高亮选中的行
+//            for (int i = 0; i < parent.getChildCount(); i++) {
+//                parent.getChildAt(i).setBackgroundColor(Color.TRANSPARENT);
+//            }
+//            view.setBackgroundColor(Color.LTGRAY);
+//
+//            File selectedFile = pdfFiles.get(position);
+//            showPDF(selectedFile);
+//        });
+
+        // 设置PDF列表项长按事件
+        pdfListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                File selectedFile = pdfFiles.get(position);
+                showFileInfoDialog(selectedFile);
+                return true;
+            }
+        });
+
+        return rootView;
     }
 
-    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+    // 检查权限状态
+    private void checkReadStoragePermission() {
+        int permissionStatus = ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.READ_EXTERNAL_STORAGE
+        );
 
-        // 确保按钮和导航配置正确
-        if (binding != null && binding.buttonFirst != null) {
-            binding.buttonFirst.setOnClickListener(v ->
-                    NavHostFragment.findNavController(FirstFragment.this)
-                            .navigate(R.id.action_FirstFragment_to_SecondFragment)
+        if (permissionStatus == PackageManager.PERMISSION_GRANTED) {
+            // 已有权限，直接读取文件
+            loadPDFs();
+        } else {
+            // 请求权限
+            ActivityCompat.requestPermissions(
+                    requireActivity(),
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                    REQUEST_CODE_READ_STORAGE
             );
+        }
+    }
+
+    private void loadPDFs() {
+
+        // 加载PDF文件列表
+        pdfFiles = new ArrayList<>();
+        File externalStorageDirectory = Environment.getExternalStorageDirectory();
+        findPDFs(externalStorageDirectory);
+
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (File file : pdfFiles) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("pdfFileName", file.getName());
+            // 根据文件类型设置图标
+            if (file.getName().endsWith(".pdf")) {
+                item.put("pdfIcon", R.drawable.ic_pdf);
+            } else {
+                item.put("pdfIcon", R.drawable.ic_document);
+            }
+            data.add(item);
+        }
+
+        // 设置PDF列表适配器
+        SimpleAdapter adapter = new SimpleAdapter(requireContext(), data,
+                R.layout.list_item_pdf,
+                new String[]{"pdfIcon", "pdfFileName"},
+                new int[]{R.id.pdfIcon, R.id.pdfFileName});
+        pdfListView.setAdapter(adapter);
+
+        // 设置ListView的选择模式为单选
+        pdfListView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+
+        // 设置PDF列表项点击事件
+        pdfListView.setOnItemClickListener(new  AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                // 高亮选中的行
+                for (int i = 0; i < parent.getChildCount(); i++) {
+                    parent.getChildAt(i).setBackgroundColor(Color.TRANSPARENT);
+                }
+                view.setBackgroundColor(Color.LTGRAY);
+
+                File selectedFile = pdfFiles.get(position);
+                showPDF(selectedFile);
+            }
+        });
+    }
+
+    private void findPDFs(File directory) {
+        // 递归查找PDF文件
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    findPDFs(file);
+                } else if (file.getName().endsWith(".pdf")) {
+                    pdfFiles.add(file);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // 处理权限请求结果
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                loadPDFs();
+            } else {
+                Toast.makeText(requireContext(), "权限被拒绝，无法读取文件", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -42,5 +217,77 @@ public class FirstFragment extends Fragment {
         super.onDestroyView();
         // 清除绑定，防止内存泄漏
         binding = null;
+    }
+
+    private void showPDF(File file) {
+        try {
+            // 显示加载进度对话框
+            progressDialog.show();
+            // 隐藏文件列表视图
+            pdfListView.setVisibility(View.GONE);
+            // 显示 PDF 视图
+            pdfView.setVisibility(View.VISIBLE);
+            backToListButton.setVisibility(View.VISIBLE);
+
+            Log.d("FirstFragment", "尝试加载 PDF 文件: " + file.getAbsolutePath());
+
+            // 显示返回按钮
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).showBackButton(true);
+            }
+            // 加载 PDF 文件
+            pdfView.fromFile(file)
+                    .defaultPage(0)
+                    .enableSwipe(true)
+                    .swipeHorizontal(false)
+                    .enableAnnotationRendering(true)
+//                    .password(null) // 若有密码，设置正确密码
+//                    .scrollHandle(null) // 可根据需要设置滚动处理
+//                    .enableAntialiasing(true) // 启用抗锯齿
+//                    .spacing(0) // 页面间距
+                    .onLoad(new OnLoadCompleteListener() {
+                        @Override
+                        public void loadComplete(int nbPages) {
+                            // 加载完成后关闭进度对话框
+                            progressDialog.dismiss();
+                            Log.d("FirstFragment", "PDF 文件加载完成，总页数: " + nbPages);
+                            pdfView.invalidate(); // 手动刷新视图
+                        }
+                    })
+                    .onError(throwable -> {
+                        // 加载出错时关闭进度对话框并显示错误信息
+                        progressDialog.dismiss();
+                        Log.e("FirstFragment", "PDF 文件加载出错: " + throwable.getMessage());
+                    })
+                    .load();
+        } catch (Exception e) {
+            // 捕获异常并关闭进度对话框
+            progressDialog.dismiss();
+            Log.e("FirstFragment", "显示 PDF 文件时出错: " + e.getMessage());
+        }
+    }
+
+    private void showFileInfoDialog(File file) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("文件信息");
+
+        // 设置对话框布局
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_file_info, null);
+        builder.setView(dialogView);
+
+        // 初始化对话框中的视图
+        EditText nameEditText = dialogView.findViewById(R.id.nameEditText);
+        EditText latitudeEditText = dialogView.findViewById(R.id.latitudeEditText);
+        EditText longitudeEditText = dialogView.findViewById(R.id.longitudeEditText);
+        CheckBox isNormalCheckBox = dialogView.findViewById(R.id.isNormalCheckBox);
+        EditText remarkEditText = dialogView.findViewById(R.id.remarkEditText);
+
+        // 设置对话框按钮
+        builder.setPositiveButton("保存", (dialog, which) -> {
+            // 处理保存逻辑
+        });
+        builder.setNegativeButton("取消", (dialog, which) -> dialog.dismiss());
+
+        builder.create().show();
     }
 }

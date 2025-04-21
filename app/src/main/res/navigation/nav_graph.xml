@@ -25,4 +25,31 @@
             android:id="@+id/action_SecondFragment_to_FirstFragment"
             app:destination="@id/FirstFragment" />
     </fragment>
+    <fragment
+        android:id="@+id/cloudFragment"
+        android:name="com.ruibang.pointmeasuretoolsv6.CloudFragment"
+        android:label="云页面"
+        tools:layout="@layout/fragment_cloud">
+        <action
+            android:id="@+id/action_cloudFragment_to_FirstFragment"
+            app:destination="@id/FirstFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/AppFragment"
+        android:name="com.ruibang.pointmeasuretoolsv6.AppFragment"
+        android:label="应用"
+        tools:layout="@layout/fragment_app" />
+    <fragment
+        android:id="@+id/MeFragment"
+        android:name="com.ruibang.pointmeasuretoolsv6.MeFragment"
+        android:label="我"
+        tools:layout="@layout/fragment_me" />
+    <!-- 切换动画 -->
+<!--    <action-->
+<!--        android:id="@+id/action_files_to_recent"-->
+<!--        app:destination="@id/recentFragment"-->
+<!--        app:enterAnim="@anim/slide_in_right"-->
+<!--        app:exitAnim="@anim/slide_out_left"-->
+<!--        app:popEnterAnim="@anim/slide_in_left"-->
+<!--        app:popExitAnim="@anim/slide_out_right"/>-->
 </navigation>
