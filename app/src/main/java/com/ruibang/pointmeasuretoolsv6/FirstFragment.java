@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,7 +39,15 @@ import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener;
 import com.ruibang.pointmeasuretoolsv6.databinding.FragmentFirstBinding;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,6 +77,7 @@ public class FirstFragment extends Fragment {
     private static final long MIN_TIME_BW_UPDATES = 1000;
     private static final float MIN_DISTANCE_CHANGE_FOR_UPDATES = 1;
 
+    private File currentPDF;//当前PDF
     @Override
     public View onCreateView(
             @NonNull LayoutInflater inflater, ViewGroup container,
@@ -265,7 +275,23 @@ public class FirstFragment extends Fragment {
 
             // 显示返回按钮
             if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).showBackButton(true);
+                MainActivity mainActivity = (MainActivity) getActivity();
+                // 显示返回按钮
+                mainActivity.showBackButton(true);
+                // 为返回按钮设置点击监听器
+//                mainActivity.findViewById(R.id.backButton).setOnClickListener(v -> {
+//                    //showFileList();
+//                    mainActivity.invalidateOptionsMenu();
+//                    // 隐藏返回按钮
+//                    //mainActivity.showBackButton(false);
+//                });
+                // 获取 Menu 对象
+                Menu menu = mainActivity.getMainMenu();
+                if (menu != null) {
+                    // 隐藏搜索和编辑按钮
+                    mainActivity.setTopAppBarMenuVisibility(menu, false);
+                }                // 隐藏搜索和编辑按钮
+                mainActivity.setTopAppBarTitle(file.getName());
             }
             // 加载 PDF 文件
             pdfView.fromFile(file)
@@ -290,6 +316,15 @@ public class FirstFragment extends Fragment {
                             progressDialog.dismiss();
                             Log.d("FirstFragment", "PDF 文件加载完成，总页数: " + nbPages);
                             pdfView.invalidate(); // 手动刷新视图
+
+                            // 对 currentPDF 赋值
+                            currentPDF = file;
+                            // 读取之前保存的定位点信息
+                            List<PointInfo> pointInfoList = readPointInfoFromLocal(file);
+                            for (PointInfo pointInfo : pointInfoList) {
+                                // 处理读取到的定位点信息，例如显示在界面上
+                                Log.d("FirstFragment", "读取到的定位点信息: " + pointInfo.toString());
+                            }
                         }
                     })
                     .onError(throwable -> {
@@ -301,21 +336,40 @@ public class FirstFragment extends Fragment {
 
             // 创建 GestureDetector 来处理长按事件
             GestureDetector gestureDetector = new GestureDetector(requireContext(), new GestureDetector.SimpleOnGestureListener() {
+                // 处理单击事件
+                @Override
+                public boolean onSingleTapUp(MotionEvent e) {
+                    // 在这里添加单击事件的处理逻辑
+                    Toast.makeText(requireContext(), "单击事件触发", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
                 @Override
                 public void onLongPress(MotionEvent e) {
-                    float x = e.getX();
-                    float y = e.getY();
-                    PointF pdfCoordinates = convertToPdfCoordinates(x, y);
+                    float screenX = e.getX();
+                    float screenY = e.getY();
+                    PointF pdfCoordinates = convertToPdfCoordinates(screenX, screenY);
                     showPositionDialog(pdfCoordinates);
                 }
+
+                @Override
+                public boolean onDoubleTap(MotionEvent e) {
+                    // 处理双击事件
+                    return true;
+                }
+
             });
 
 
-
+//            pdfView.setOnLongClickListener((v, event) -> {
+//                // 返回 gestureDetector.onTouchEvent(event) 的结果，让其处理触摸事件
+//                return gestureDetector.onTouchEvent(event);
+//            });
             // 确保触摸事件能传递到长按监听器
             pdfView.setOnTouchListener((v, event) -> {
+
                 // 返回 gestureDetector.onTouchEvent(event) 的结果，让其处理触摸事件
                 return gestureDetector.onTouchEvent(event);
+
             });
             // 添加长按监听器
 //            pdfView.setOnLongClickListener(new View.OnLongClickListener() {
@@ -362,46 +416,79 @@ public class FirstFragment extends Fragment {
         pdfXEditText.setText(String.valueOf(pdfPoint.x));
         pdfYEditText.setText(String.valueOf(pdfPoint.y));
 
-        // 获取系统经纬度
-        locationManager = (LocationManager) requireActivity().getSystemService(Context.LOCATION_SERVICE);
-        try {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_TIME_BW_UPDATES,
-                    MIN_DISTANCE_CHANGE_FOR_UPDATES, new LocationListener() {
-                        @Override
-                        public void onLocationChanged(Location location) {
-                            // 保留四位小数
-                            DecimalFormat df = new DecimalFormat("#.####");
-                            latitudeEditText.setText(df.format(location.getLatitude()));
-                            longitudeEditText.setText(df.format(location.getLongitude()));
-                            // 移除监听器，避免持续更新
-                            locationManager.removeUpdates(this);
-                        }
-
-                        @Override
-                        public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-                        @Override
-                        public void onProviderEnabled(String provider) {}
-
-                        @Override
-                        public void onProviderDisabled(String provider) {}
-                    });
-        } catch (SecurityException e) {
-            e.printStackTrace();
-        }
-
         // 设置对话框按钮
         builder.setPositiveButton("确定", (dialog, which) -> {
-            // 处理保存逻辑
+            // 获取输入的数据
             String name = nameEditText.getText().toString();
             String type = (String) typeSpinner.getSelectedItem();
             String latitude = latitudeEditText.getText().toString();
             String longitude = longitudeEditText.getText().toString();
-            // 可以在这里添加保存数据的逻辑
+            String pdfX = pdfXEditText.getText().toString();
+            String pdfY = pdfYEditText.getText().toString();
+
+            // 保存数据到本地
+            savePointInfoToLocal(name, type, latitude, longitude, pdfX, pdfY);
         });
         builder.setNegativeButton("取消", (dialog, which) -> dialog.dismiss());
 
         builder.create().show();
+    }
+
+    private void savePointInfoToLocal(String name, String type, String latitude, String longitude, String pdfX, String pdfY) {
+        try {
+            // 获取当前打开的 PDF 文件的唯一标识
+            String pdfFileId = getFileId(currentPDF);
+
+            // 获取存储目录
+            File storageDir = requireContext().getFilesDir();
+            File jsonFile = new File(storageDir, pdfFileId + ".json");
+
+            JSONArray jsonArray;
+            if (jsonFile.exists()) {
+                // 读取已有的数据
+                String jsonContent = readFile(jsonFile);
+                jsonArray = new JSONArray(jsonContent);
+            } else {
+                jsonArray = new JSONArray();
+            }
+
+            // 创建新的定位点信息对象
+            JSONObject pointInfo = new JSONObject();
+            pointInfo.put("name", name);
+            pointInfo.put("type", type);
+            pointInfo.put("latitude", latitude);
+            pointInfo.put("longitude", longitude);
+            pointInfo.put("pdfX", pdfX);
+            pointInfo.put("pdfY", pdfY);
+
+            // 添加到数组中
+            jsonArray.put(pointInfo);
+
+            // 写入文件
+            FileWriter writer = new FileWriter(jsonFile);
+            writer.write(jsonArray.toString());
+            writer.close();
+        } catch (JSONException | IOException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String getFileId(File file) throws NoSuchAlgorithmException {
+        String filePath = file.getAbsolutePath();
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(filePath.getBytes());
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : hash) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) hexString.append('0');
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+
+    private String readFile(File file) throws IOException {
+        java.util.Scanner scanner = new java.util.Scanner(file).useDelimiter("\\Z");
+        return scanner.hasNext() ? scanner.next() : "";
     }
 
     private void showFileInfoDialog(File file) {
@@ -416,7 +503,6 @@ public class FirstFragment extends Fragment {
         EditText nameEditText = dialogView.findViewById(R.id.nameEditText);
         EditText latitudeEditText = dialogView.findViewById(R.id.latitudeEditText);
         EditText longitudeEditText = dialogView.findViewById(R.id.longitudeEditText);
-        CheckBox isNormalCheckBox = dialogView.findViewById(R.id.isNormalCheckBox);
         EditText remarkEditText = dialogView.findViewById(R.id.remarkEditText);
 
         // 设置对话框按钮
@@ -435,4 +521,150 @@ public class FirstFragment extends Fragment {
             ((MainActivity) getActivity()).showBackButton(false);
         }
     }
+
+    public List<PointInfo> readPointInfoFromLocal(File file) {
+        List<PointInfo> pointInfoList = new ArrayList<>();
+        try {
+            // 获取当前打开的 PDF 文件的唯一标识
+            String pdfFileId = getFileId(file);
+
+            // 获取存储目录
+            File storageDir = requireContext().getFilesDir();
+            File jsonFile = new File(storageDir, pdfFileId + ".json");
+
+            if (jsonFile.exists()) {
+                // 读取文件内容
+                String jsonContent = readFile(jsonFile);
+                JSONArray jsonArray = new JSONArray(jsonContent);
+
+                // 解析 JSON 数据
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    JSONObject pointInfoObject = jsonArray.getJSONObject(i);
+                    String name = pointInfoObject.getString("name");
+                    String type = pointInfoObject.getString("type");
+                    String latitude = pointInfoObject.getString("latitude");
+                    String longitude = pointInfoObject.getString("longitude");
+                    String pdfX = pointInfoObject.getString("pdfX");
+                    String pdfY = pointInfoObject.getString("pdfY");
+
+                    PointInfo pointInfo = new PointInfo(name, type, latitude, longitude, pdfX, pdfY);
+                    pointInfoList.add(pointInfo);
+                }
+            }
+        } catch (JSONException | IOException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        return pointInfoList;
+    }
+
+    public String[] getPointNames() {
+        List<PointInfo> pointInfoList = readPointInfoFromLocal(currentPDF);
+        List<String> pointNames = new ArrayList<>();
+        for (PointInfo pointInfo : pointInfoList) {
+            pointNames.add(pointInfo.name);
+        }
+        return pointNames.toArray(new String[0]);
+    }
+
+    /**
+     * 获取当前的 PDF 文件
+     */
+    public File getCurrentPDF() {
+        return currentPDF;
+    }
+
+    public void updatePointInfo(PointInfo oldPoint, PointInfo newPoint) {
+        try {
+            // 获取当前打开的 PDF 文件的唯一标识
+            String pdfFileId = getFileId(currentPDF);
+
+            // 获取存储目录
+            File storageDir = requireContext().getFilesDir();
+            File jsonFile = new File(storageDir, pdfFileId + ".json");
+
+            if (jsonFile.exists()) {
+                // 读取已有的数据
+                String jsonContent = readFile(jsonFile);
+                JSONArray jsonArray = new JSONArray(jsonContent);
+
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    JSONObject pointInfoObject = jsonArray.getJSONObject(i);
+                    if (pointInfoObject.getString("name").equals(oldPoint.name) &&
+                            pointInfoObject.getString("latitude").equals(oldPoint.latitude) &&
+                            pointInfoObject.getString("longitude").equals(oldPoint.longitude) &&
+                            pointInfoObject.getString("pdfX").equals(oldPoint.pdfX) &&
+                            pointInfoObject.getString("pdfY").equals(oldPoint.pdfY)) {
+                        // 创建新的定位点信息对象
+                        JSONObject newPointInfo = new JSONObject();
+                        newPointInfo.put("name", newPoint.name);
+                        newPointInfo.put("type", newPoint.type);
+                        newPointInfo.put("latitude", newPoint.latitude);
+                        newPointInfo.put("longitude", newPoint.longitude);
+                        newPointInfo.put("pdfX", newPoint.pdfX);
+                        newPointInfo.put("pdfY", newPoint.pdfY);
+                        newPointInfo.put("isNormal", newPoint.isNormal);
+                        newPointInfo.put("remark", newPoint.remark);
+
+                        // 替换原有的对象
+                        jsonArray.put(i, newPointInfo);
+                        break;
+                    }
+                }
+
+                // 写入文件
+                FileWriter writer = new FileWriter(jsonFile);
+                writer.write(jsonArray.toString());
+                writer.close();
+            }
+        } catch (JSONException | IOException | NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+// 定义定位点信息类
+class PointInfo {
+    String name;
+    String type;
+    String latitude;
+    String longitude;
+    String pdfX;
+    String pdfY;
+    boolean isNormal;
+    String remark;
+
+    // 新增 8 个参数的构造函数
+    public PointInfo(String name, String type, String latitude, String longitude, String pdfX, String pdfY) {
+        this.name = name;
+        this.type = type;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.pdfX = pdfX;
+        this.pdfY = pdfY;
+        this.remark = "";
+    }
+    public PointInfo(String name, String type, String latitude, String longitude, String pdfX, String pdfY, String remark) {
+        this.name = name;
+        this.type = type;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.pdfX = pdfX;
+        this.pdfY = pdfY;
+        this.remark = remark;
+    }
+
+    @Override
+    public String toString() {
+        return "PointInfo{" +
+                "name='" + name + '\'' +
+                ", type='" + type + '\'' +
+                ", latitude='" + latitude + '\'' +
+                ", longitude='" + longitude + '\'' +
+                ", pdfX='" + pdfX + '\'' +
+                ", pdfY='" + pdfY + '\'' +
+                ", remark='" + remark + '\'' +
+                '}';
+    }
+
+
 }

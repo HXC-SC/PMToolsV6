@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp">
+
+    <!-- 定位点名称 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="定位点名称："
+            android:textSize="16sp"
+            android:paddingEnd="8dp"/>
+
+        <EditText
+            android:id="@+id/nameEditText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="请输入定位点名称"
+            android:background="@android:drawable/editbox_background" />
+    </LinearLayout>
+
+    <!-- 定位点类型 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="定位点类型："
+            android:textSize="16sp"
+            android:paddingEnd="8dp"/>
+
+        <Spinner
+            android:id="@+id/typeSpinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:entries="@array/position_types"
+            android:background="@android:drawable/btn_dropdown" />
+    </LinearLayout>
+
+    <!-- 经纬度 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="经纬度："
+            android:textSize="16sp"
+            android:paddingEnd="8dp"/>
+
+        <EditText
+            android:id="@+id/longitudeEditText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="经度"
+            android:background="@android:drawable/editbox_background"
+            android:paddingEnd="8dp"/>
+
+        <EditText
+            android:id="@+id/latitudeEditText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="纬度"
+            android:background="@android:drawable/editbox_background" />
+    </LinearLayout>
+
+    <!-- 点位置信息 x 和 y -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="文档位置："
+            android:textSize="16sp"
+            android:paddingEnd="8dp"/>
+
+        <EditText
+            android:id="@+id/pdfXEditText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="X"
+            android:background="@android:drawable/editbox_background"
+            android:paddingEnd="8dp"
+            android:enabled="false"/>
+
+        <EditText
+            android:id="@+id/pdfYEditText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Y"
+            android:background="@android:drawable/editbox_background"
+            android:enabled="false"/>
+    </LinearLayout>
+    <EditText
+        android:id="@+id/remarkEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="备注"/>
+</LinearLayout>

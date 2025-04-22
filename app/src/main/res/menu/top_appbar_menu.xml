@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+<!--    <item-->
+<!--        android:id="@+id/backButton"-->
+<!--        android:title="返回"-->
+<!--        android:icon="@drawable/ic_back"-->
+<!--        app:showAsAction="always"-->
+<!--        android:visible="false"/>-->
     <item
         android:id="@+id/search"
         android:title="搜索"
@@ -8,9 +14,15 @@
         app:showAsAction="ifRoom" />
 
     <item
-        android:id="@+id/more"
+        android:id="@+id/edit"
         android:title="编辑"
         android:icon="@drawable/ic_edit"
         app:showAsAction="ifRoom"/>
 
+    <item
+        android:id="@+id/data"
+        android:title="数据"
+        android:icon="@drawable/ic_data"
+        app:showAsAction="ifRoom"
+        android:visible="false"/>
 </menu>
