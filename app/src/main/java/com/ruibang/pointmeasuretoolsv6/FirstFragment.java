@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.PointF;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -33,6 +34,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.GestureDetectorCompat;
 import androidx.fragment.app.Fragment;
 
 import com.github.barteksc.pdfviewer.PDFView;
@@ -56,8 +58,8 @@ import java.text.DecimalFormat;
 
 
 
-public class FirstFragment extends Fragment {
-
+public class FirstFragment extends Fragment implements GestureDetector.OnGestureListener, GestureDetector.OnDoubleTapListener {
+    private GestureDetectorCompat gestureDetector;
     private FragmentFirstBinding binding;
     private Button backToListButton;
     private ProgressDialog progressDialog;
@@ -73,11 +75,15 @@ public class FirstFragment extends Fragment {
     private static float mPageHeight;   // 页面高度
     private static float mScaleFactor;  // 缩放因子
 
-    private LocationManager locationManager;
-    private static final long MIN_TIME_BW_UPDATES = 1000;
-    private static final float MIN_DISTANCE_CHANGE_FOR_UPDATES = 1;
-
+    private Handler longPressHandler = new Handler();
+    private Runnable longPressRunnable;
     private File currentPDF;//当前PDF
+
+    private long downTime;
+    private long upTime;
+
+    private float screenX;
+    private float screenY;
     @Override
     public View onCreateView(
             @NonNull LayoutInflater inflater, ViewGroup container,
@@ -278,13 +284,6 @@ public class FirstFragment extends Fragment {
                 MainActivity mainActivity = (MainActivity) getActivity();
                 // 显示返回按钮
                 mainActivity.showBackButton(true);
-                // 为返回按钮设置点击监听器
-//                mainActivity.findViewById(R.id.backButton).setOnClickListener(v -> {
-//                    //showFileList();
-//                    mainActivity.invalidateOptionsMenu();
-//                    // 隐藏返回按钮
-//                    //mainActivity.showBackButton(false);
-//                });
                 // 获取 Menu 对象
                 Menu menu = mainActivity.getMainMenu();
                 if (menu != null) {
@@ -333,56 +332,55 @@ public class FirstFragment extends Fragment {
                         Log.e("FirstFragment", "PDF 文件加载出错: " + throwable.getMessage());
                     })
                     .load();
-
-            // 创建 GestureDetector 来处理长按事件
-            GestureDetector gestureDetector = new GestureDetector(requireContext(), new GestureDetector.SimpleOnGestureListener() {
-                // 处理单击事件
-                @Override
-                public boolean onSingleTapUp(MotionEvent e) {
-                    // 在这里添加单击事件的处理逻辑
-                    Toast.makeText(requireContext(), "单击事件触发", Toast.LENGTH_SHORT).show();
-                    return true;
-                }
-                @Override
-                public void onLongPress(MotionEvent e) {
-                    float screenX = e.getX();
-                    float screenY = e.getY();
-                    PointF pdfCoordinates = convertToPdfCoordinates(screenX, screenY);
-                    showPositionDialog(pdfCoordinates);
-                }
-
-                @Override
-                public boolean onDoubleTap(MotionEvent e) {
-                    // 处理双击事件
-                    return true;
-                }
-
-            });
+            // 初始化手势检测器
+            gestureDetector = new GestureDetectorCompat(requireContext(), this);
+            gestureDetector.setOnDoubleTapListener(this); // 设置双击监听
 
 
-//            pdfView.setOnLongClickListener((v, event) -> {
-//                // 返回 gestureDetector.onTouchEvent(event) 的结果，让其处理触摸事件
-//                return gestureDetector.onTouchEvent(event);
-//            });
             // 确保触摸事件能传递到长按监听器
             pdfView.setOnTouchListener((v, event) -> {
 
-                // 返回 gestureDetector.onTouchEvent(event) 的结果，让其处理触摸事件
-                return gestureDetector.onTouchEvent(event);
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        screenX = event.getX();
+                        screenY = event.getY();
+                        //downTime = event.getDownTime();
+                        //longPressHandler.postDelayed(longPressRunnable, 6000); // 设置长按阈值（例如800ms）
+                        return false;
+                    case MotionEvent.ACTION_MOVE:
+                        // 检测移动距离，若超过阈值则取消长按
+//                        if (Math.abs(event.getX() - downX) > touchSlop ||
+//                                Math.abs(event.getY() - downY) > touchSlop) {
+//                            longPressHandler.removeCallbacks(longPressRunnable);
+//                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+//                        upTime = event.getEventTime();
+//                        if(upTime - downTime > 1200){
+//                            float screenX = event.getX();
+//                            float screenY = event.getY();
+//                            PointF pdfCoordinates = convertToPdfCoordinates(screenX, screenY);
+//                            showPositionDialog(pdfCoordinates);
+//                        }
+                        //gestureDetector.onTouchEvent(event);
 
+                        //longPressHandler.removeCallbacks(longPressRunnable);
+                        break;
+                }
+
+                return gestureDetector.onTouchEvent(event);
             });
             // 添加长按监听器
-//            pdfView.setOnLongClickListener(new View.OnLongClickListener() {
-//                @Override
-//                public boolean onLongClick(View v) {
-//                    float x = v.getX();
-//                    float y = v.getY();
-//                    // 获取文档上的位置，这里简单假设屏幕位置和文档位置一致，实际可能需要转换
-//                    // 可根据 pdfView 的缩放、滚动等状态进行精确转换
-//                    showPositionDialog(x, y);
-//                    return true;
-//                }
-//            });
+            pdfView.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    PointF pdfCoordinates = convertToPdfCoordinates(screenX, screenY);
+                    // 获取文档上的位置，这里简单假设屏幕位置和文档位置一致，实际可能需要转换
+                    // 可根据 pdfView 的缩放、滚动等状态进行精确转换
+                    showPositionDialog(pdfCoordinates);
+                    return true;
+                }
+            });
         } catch (Exception e) {
             // 捕获异常并关闭进度对话框
             progressDialog.dismiss();
@@ -503,7 +501,6 @@ public class FirstFragment extends Fragment {
         EditText nameEditText = dialogView.findViewById(R.id.nameEditText);
         EditText latitudeEditText = dialogView.findViewById(R.id.latitudeEditText);
         EditText longitudeEditText = dialogView.findViewById(R.id.longitudeEditText);
-        EditText remarkEditText = dialogView.findViewById(R.id.remarkEditText);
 
         // 设置对话框按钮
         builder.setPositiveButton("保存", (dialog, which) -> {
@@ -619,6 +616,70 @@ public class FirstFragment extends Fragment {
         } catch (JSONException | IOException | NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
+    }
+
+    // 实现 OnGestureListener 接口的方法
+    @Override
+    public boolean onDown(MotionEvent e) {
+        return false;
+    }
+
+    //用户按下屏幕后，100ms 内未移动或抬起手指
+    @Override
+    public void onShowPress(MotionEvent e) {
+    }
+
+    // 用户轻触屏幕后快速抬起手指（未触发滑动或长按）
+    @Override
+    public boolean onSingleTapUp(MotionEvent e) {
+        Toast.makeText(requireContext(), "onSingleTapUp", Toast.LENGTH_SHORT).show();
+        return false;
+    }
+
+    // 用户在屏幕上滑动，e1 为第一次按下的事件，e2 为当前滑动的事件，distanceX 和 distanceY 分别为水平和垂直方向上的滑动距离
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        return false;
+    }
+
+
+    @Override
+    public void onLongPress(MotionEvent e) {
+
+        float screenX = e.getX();
+        float screenY = e.getY();
+        PointF pdfCoordinates = convertToPdfCoordinates(screenX, screenY);
+        showPositionDialog(pdfCoordinates);
+    }
+
+    // 用户在屏幕上滑动，e1 为第一次按下的事件，e2 为当前滑动的事件，velocityX 和 velocityY 分别为水平和垂直方向上的滑动速度
+    // 注意：滑动事件会在 onScroll 事件之后触发，因此如果需要处理滑动事件，需要在 onScroll 事件中判断是否为滑动事件
+    @Override
+    public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+        Toast.makeText(requireContext(), "onFling", Toast.LENGTH_SHORT).show();
+        return false;
+    }
+
+    // 实现 OnDoubleTapListener 接口的方法
+    @Override
+    public boolean onSingleTapConfirmed(MotionEvent e) {
+        // 处理单击确认事件
+        Toast.makeText(requireContext(), "单击确认事件触发", Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    @Override
+    public boolean onDoubleTap(MotionEvent e) {
+        // 处理双击事件
+        Toast.makeText(requireContext(), "双击事件触发", Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    @Override
+    public boolean onDoubleTapEvent(MotionEvent e) {
+        // 处理双击事件
+        Toast.makeText(requireContext(), "双击事件触发", Toast.LENGTH_SHORT).show();
+        return false;
     }
 }
 
