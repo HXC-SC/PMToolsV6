@@ -27,46 +27,6 @@
             android:src="@drawable/ic_back"
             android:visibility="gone"
             android:background="?attr/selectableItemBackgroundBorderless" />
-        <!-- 顶部栏 -->
-<!--        <LinearLayout-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:orientation="horizontal"-->
-<!--            android:padding="8dp"-->
-<!--            android:background="@android:color/darker_gray">-->
-
-<!--            <TextView-->
-<!--                android:id="@+id/titleTextView"-->
-<!--                android:layout_width="0dp"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_weight="1"-->
-<!--                android:text="文件列表"-->
-<!--                android:textSize="18sp"-->
-<!--                android:textColor="@android:color/white"/>-->
-
-<!--            <Button-->
-<!--                android:id="@+id/searchButton"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:background="@android:color/transparent"-->
-<!--                android:drawableBottom="@drawable/ic_search"-->
-<!--                android:drawablePadding="4dp"-->
-<!--                android:drawableTint="@android:color/white"-->
-<!--                android:maxHeight="24px"-->
-<!--                android:maxWidth="24px"/>-->
-
-<!--            <Button-->
-<!--                android:id="@+id/editButton"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:background="@android:color/transparent"-->
-<!--                android:drawablePadding="4dp"-->
-<!--                android:drawableTint="@android:color/white"-->
-<!--                android:drawableBottom="@drawable/ic_edit"-->
-<!--                android:maxHeight="24px"-->
-<!--                android:maxWidth="24px"/>-->
-
-<!--        </LinearLayout>-->
 
         <!-- 中间内容区域 -->
         <FrameLayout
@@ -74,23 +34,6 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_weight="1">
-
-<!--            <TextView-->
-<!--                android:id="@+id/pdfOperationHint"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:text="PDF操作提示"-->
-<!--                android:visibility="gone"-->
-<!--                android:layout_gravity="center"-->
-<!--                android:textSize="16sp"-->
-<!--                android:textColor="@android:color/black"/>-->
-
-<!--            <ListView-->
-<!--                android:id="@+id/pdfListView"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:visibility="gone"/>-->
-
 
             <fragment
                 android:id="@+id/nav_host_fragment_content_main"

@@ -69,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
     // 新增成员变量，用于保存 Menu 对象
     private Menu mainMenu;
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -77,6 +78,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
         topAppBar = binding.topAppBar; // 通过数据绑定获取顶部栏
         backButton = topAppBar.findViewById(R.id.backButton);
+        bottomNavigationView = findViewById(R.id.bottomNavigationView);
+
         // 设置 MaterialToolbar 作为动作栏
         setSupportActionBar(topAppBar);
 
@@ -114,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_cloud) {
                 // 切换到“云”界面
                 try {
+                    setTopAppBarTitle("云文档"); // 设置顶部栏标题
                     navController.navigate(R.id.cloudFragment);
                 } catch (IllegalArgumentException e) {
                     Log.e("MainActivity", "导航到 cloudFragment 失败: " + e.getMessage());
@@ -123,6 +127,7 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_app) {
                 // 切换到“应用”界面
                 try {
+                    setTopAppBarTitle("应用");
                     navController.navigate(R.id.AppFragment);
                 } catch (IllegalArgumentException e) {
                     Log.e("MainActivity", "导航到 AppFragment 失败: " + e.getMessage());
@@ -132,6 +137,7 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_me) {
                 // 切换到“我”界面
                 try {
+                    setTopAppBarTitle("个人信息");
                     navController.navigate(R.id.MeFragment);
                 } catch (IllegalArgumentException e) {
                     Log.e("MainActivity", "导航到 MeFragment 失败: " + e.getMessage());
@@ -175,12 +181,20 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+//        if (!OpenCVLoader.initDebug()) {
+//            Log.e("OpenCV", "初始化失败");
+//            Toast.makeText(this, "OpenCV 初始化失败", Toast.LENGTH_LONG).show();
+//        }else{
+//            Log.d("OpenCV", "初始化成功");
+//            Toast.makeText(this, "OpenCV 初始化成功", Toast.LENGTH_LONG).show();
+//        }
     }
 
     public void initFirstFragment() {
         showBackButton(false);
         setTopAppBarTitle("文档"); // 设置顶部栏标题
         setTopAppBarMenuVisibility(mainMenu, true);
+        setTopAppBarDataBtnVisibility(false);
     }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -189,6 +203,11 @@ public class MainActivity extends AppCompatActivity {
         // 保存 Menu 对象
         this.mainMenu = menu;
         return true;
+    }
+
+    public void replaceBottomNavigationMenu(int menuResId) {
+        bottomNavigationView.getMenu().clear();
+        bottomNavigationView.inflateMenu(menuResId);
     }
 
     /**
@@ -317,15 +336,20 @@ public class MainActivity extends AppCompatActivity {
         if (menu != null) {
             MenuItem searchItem = menu.findItem(R.id.search);
             MenuItem editItem = menu.findItem(R.id.edit);
-            MenuItem dataItem = menu.findItem(R.id.data);
             if (searchItem != null) {
                 searchItem.setVisible(show);
             }
             if (editItem != null) {
                 editItem.setVisible(show);
             }
-            if(dataItem != null){
-                dataItem.setVisible(!show);
+
+        }
+    }
+    public void setTopAppBarDataBtnVisibility(boolean show){
+        if (mainMenu != null) {
+            MenuItem dataItem = mainMenu.findItem(R.id.data);
+            if (dataItem != null) {
+                dataItem.setVisible(show);
             }
         }
     }

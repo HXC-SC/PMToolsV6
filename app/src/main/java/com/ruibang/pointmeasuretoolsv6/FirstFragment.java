@@ -12,15 +12,19 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.GestureDetector;
+import android.view.MenuInflater;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.SearchView;
 import android.widget.Spinner;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -28,10 +32,14 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GestureDetectorCompat;
@@ -61,7 +69,7 @@ import java.text.DecimalFormat;
 public class FirstFragment extends Fragment implements GestureDetector.OnGestureListener, GestureDetector.OnDoubleTapListener {
     private GestureDetectorCompat gestureDetector;
     private FragmentFirstBinding binding;
-    private Button backToListButton;
+    //private Button backToListButton;
     private ProgressDialog progressDialog;
     private PDFView pdfView;
     private ListView pdfListView;
@@ -84,6 +92,13 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
 
     private float screenX;
     private float screenY;
+
+    private Menu mainMenu; //
+
+    private SearchView searchView;
+    private List<File> allPdfFiles; // 备份所有文件列表
+    private boolean isEditing = false;
+    private boolean isSearching  = false;
     @Override
     public View onCreateView(
             @NonNull LayoutInflater inflater, ViewGroup container,
@@ -104,6 +119,24 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
         // 初始化PDF视图
         pdfView = rootView.findViewById(R.id.pdfView);
 
+        // 设置返回按钮可见性
+        setHasOptionsMenu(true);
+
+        // 初始化搜索视图
+        searchView = rootView.findViewById(R.id.searchView);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                filterFiles(newText);
+                return true;
+            }
+        });
+
         //检查权限
         checkReadStoragePermission();//读取外部存储权限
         checkLocationPermission();  //定位权限位置权限
@@ -118,21 +151,21 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
 //        }
 
         // 初始化返回列表按钮并设置点击事件
-        backToListButton = binding.backToListButton;
-        backToListButton.setOnClickListener(new  View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pdfView.setVisibility(View.GONE);
-                //pdfOperationHint.setVisibility(View.GONE);
-                backToListButton.setVisibility(View.GONE);
-                pdfListView.setVisibility(View.VISIBLE);
-
-                // 隐藏返回按钮
-                if (getActivity() instanceof MainActivity) {
-                    ((MainActivity) getActivity()).showBackButton(false);
-                }
-            }
-        });
+//        backToListButton = binding.backToListButton;
+//        backToListButton.setOnClickListener(new  View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                pdfView.setVisibility(View.GONE);
+//                //pdfOperationHint.setVisibility(View.GONE);
+//                backToListButton.setVisibility(View.GONE);
+//                pdfListView.setVisibility(View.VISIBLE);
+//
+//                // 隐藏返回按钮
+//                if (getActivity() instanceof MainActivity) {
+//                    ((MainActivity) getActivity()).showBackButton(false);
+//                }
+//            }
+//        });
 
 
         // 设置PDF列表项长按事件
@@ -275,7 +308,7 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
             pdfListView.setVisibility(View.GONE);
             // 显示 PDF 视图
             pdfView.setVisibility(View.VISIBLE);
-            backToListButton.setVisibility(View.VISIBLE);
+            //backToListButton.setVisibility(View.VISIBLE);
 
             Log.d("FirstFragment", "尝试加载 PDF 文件: " + file.getAbsolutePath());
 
@@ -289,7 +322,9 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
                 if (menu != null) {
                     // 隐藏搜索和编辑按钮
                     mainActivity.setTopAppBarMenuVisibility(menu, false);
-                }                // 隐藏搜索和编辑按钮
+                    //显示数据按钮
+                    mainActivity.setTopAppBarDataBtnVisibility(true);
+                }
                 mainActivity.setTopAppBarTitle(file.getName());
             }
             // 加载 PDF 文件
@@ -512,7 +547,7 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
     }
     public void showFileList() {
         pdfView.setVisibility(View.GONE);
-        backToListButton.setVisibility(View.GONE);
+        //backToListButton.setVisibility(View.GONE);
         pdfListView.setVisibility(View.VISIBLE);
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).showBackButton(false);
@@ -680,6 +715,266 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
         // 处理双击事件
         Toast.makeText(requireContext(), "双击事件触发", Toast.LENGTH_SHORT).show();
         return false;
+    }
+
+//    @Override
+//    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+//        inflater.inflate(R.menu.top_appbar_menu, menu);
+//        this.mainMenu = menu;
+//        super.onCreateOptionsMenu(menu, inflater);
+//    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.search) {
+            // 处理搜索按钮点击事件
+            if (!isSearching){
+                enableSearchMode();
+                isSearching = true;
+            }
+            return true;
+        }
+        if (item.getItemId() == R.id.edit) {
+            if (!isEditing) {
+                enableEditMode();
+                isEditing = true;
+            }
+            return true;
+        }
+        if (item.getItemId() == android.R.id.home) {
+            // 处理返回按钮点击事件
+//            getActivity().onBackPressed();
+            if (isEditing) {
+                disableEditMode();
+                isEditing = false;
+            }
+            if (isSearching) {
+                disableSearchMode();
+                isSearching = false;
+            }
+
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void enableEditMode() {
+        // 隐藏搜索和编辑按钮
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            Menu menu = mainActivity.getMainMenu();
+            if (menu != null) {
+                mainActivity.setTopAppBarMenuVisibility(menu, false);
+            }
+        }
+        // 显示返回按钮
+        AppCompatActivity activity = (AppCompatActivity) getActivity();
+        if (activity != null) {
+            //获取顶部栏
+            ActionBar actionBar = activity.getSupportActionBar();
+            if (actionBar != null) {
+                // 显示返回按钮
+                //用户点击该按钮，系统会调用 Activity 的 onOptionsItemSelected() 方法
+                //其中 item.getItemId() 为 android.R.id.home
+                actionBar.setDisplayHomeAsUpEnabled(true);
+            }
+        }
+
+        // 替换列表项布局
+        // 重新设置适配器，使用 list_item_pdf_editable.xml
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (File file : pdfFiles) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("pdfFileName", file.getName());
+            if (file.getName().endsWith(".pdf")) {
+                item.put("pdfIcon", R.drawable.ic_pdf);
+            } else {
+                item.put("pdfIcon", R.drawable.ic_document);
+            }
+            data.add(item);
+        }
+        SimpleAdapter adapter = new SimpleAdapter(requireContext(), data,
+                R.layout.list_item_pdf_editable,
+                new String[]{"pdfIcon", "pdfFileName"},
+                new int[]{R.id.pdfIcon, R.id.pdfFileName});
+        pdfListView.setAdapter(adapter);
+
+        // 获取父布局
+        ViewGroup parentLayout = (ViewGroup) pdfListView.getParent();
+
+        // 添加“全选”按钮
+        if (parentLayout instanceof ConstraintLayout) {
+            TextView selectAllTextView = new TextView(requireContext());
+            selectAllTextView.setText("全选");
+            selectAllTextView.setOnClickListener(v -> {
+                boolean allChecked = true;
+                for (int i = 0; i < pdfListView.getChildCount(); i++) {
+                    CheckBox checkBox = pdfListView.getChildAt(i).findViewById(R.id.checkBox);
+                    if (checkBox != null && !checkBox.isChecked()) {
+                        allChecked = false;
+                        break;
+                    }
+                }
+
+                for (int i = 0; i < pdfListView.getChildCount(); i++) {
+                    CheckBox checkBox = pdfListView.getChildAt(i).findViewById(R.id.checkBox);
+                    if (checkBox != null) {
+                        checkBox.setChecked(!allChecked);
+                    }
+                }
+            });
+
+            // 将“全选”按钮添加到父布局中
+            parentLayout.addView(selectAllTextView, 0);
+        }
+        // 替换底部导航栏按钮
+        // 这里需要修改底部导航栏的菜单文件
+        // 假设底部导航栏使用的是 bottom_nav_menu.xml
+        // 可以动态替换菜单
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            mainActivity.replaceBottomNavigationMenu(R.menu.bottom_nav_menu_editable);
+        }
+    }
+
+    private void disableEditMode() {
+        // 隐藏返回按钮
+        AppCompatActivity activity = (AppCompatActivity) getActivity();
+        if (activity != null) {
+            ActionBar actionBar = activity.getSupportActionBar();
+            if (actionBar != null) {
+                actionBar.setDisplayHomeAsUpEnabled(false);
+            }
+        }
+        // 恢复底部导航栏按钮
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            mainActivity.replaceBottomNavigationMenu(R.menu.bottom_nav_menu);
+        }
+
+        // 恢复列表项布局
+        // 重新设置适配器，使用原来的布局
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (File file : pdfFiles) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("pdfFileName", file.getName());
+            if (file.getName().endsWith(".pdf")) {
+                item.put("pdfIcon", R.drawable.ic_pdf);
+            } else {
+                item.put("pdfIcon", R.drawable.ic_document);
+            }
+            data.add(item);
+        }
+        SimpleAdapter adapter = new SimpleAdapter(requireContext(), data,
+                R.layout.list_item_pdf,
+                new String[]{"pdfIcon", "pdfFileName"},
+                new int[]{R.id.pdfIcon, R.id.pdfFileName});
+        pdfListView.setAdapter(adapter);
+
+        // 修改类型转换为 ViewGroup
+        ViewGroup parentLayout = (ViewGroup) pdfListView.getParent();
+        TextView selectAllTextView = null;
+        for (int i = 0; i < parentLayout.getChildCount(); i++) {
+            View child = parentLayout.getChildAt(i);
+            if (child instanceof TextView && ((TextView) child).getText().equals("全选")) {
+                selectAllTextView = (TextView) child;
+                break;
+            }
+        }
+        if (selectAllTextView != null) {
+            parentLayout.removeView(selectAllTextView);
+        }
+
+        // 恢复底部导航栏按钮
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            mainActivity.replaceBottomNavigationMenu(R.menu.bottom_nav_menu);
+        }
+        //恢复顶部导航栏按钮
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            mainActivity.setTopAppBarMenuVisibility(mainActivity.getMainMenu(), true);
+        }
+    }
+
+    private void filterFiles(String query) {
+        List<File> filteredFiles = new ArrayList<>();
+        if (query.isEmpty()) {
+            filteredFiles.addAll(allPdfFiles);
+        } else {
+            for (File file : allPdfFiles) {
+                if (file.getName().toLowerCase().contains(query.toLowerCase())) {
+                    filteredFiles.add(file);
+                }
+            }
+        }
+
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (File file : filteredFiles) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("pdfFileName", file.getName());
+            if (file.getName().endsWith(".pdf")) {
+                item.put("pdfIcon", R.drawable.ic_pdf);
+            } else {
+                item.put("pdfIcon", R.drawable.ic_document);
+            }
+            data.add(item);
+        }
+
+        SimpleAdapter adapter = new SimpleAdapter(requireContext(), data,
+                R.layout.list_item_pdf,
+                new String[]{"pdfIcon", "pdfFileName"},
+                new int[]{R.id.pdfIcon, R.id.pdfFileName});
+        pdfListView.setAdapter(adapter);
+    }
+
+    private void enableSearchMode() {
+        // 备份所有文件列表
+        allPdfFiles = new ArrayList<>(pdfFiles);
+
+        // 显示搜索输入框
+        searchView.setVisibility(View.VISIBLE);
+
+        // 调整 ListView 的布局参数，确保从搜索框下方开始
+        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) pdfListView.getLayoutParams();
+        params.topToBottom = R.id.searchView;
+        pdfListView.setLayoutParams(params);
+
+        // 显示顶部栏的返回按钮
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            ActionBar actionBar = mainActivity.getSupportActionBar();
+            if (actionBar != null) {
+                actionBar.setDisplayHomeAsUpEnabled(true);
+            }
+        }
+    }
+
+    private void disableSearchMode() {
+        // 隐藏搜索输入框
+        searchView.setVisibility(View.GONE);
+
+        // 恢复 ListView 的布局参数
+        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) pdfListView.getLayoutParams();
+        params.topToBottom = ConstraintLayout.LayoutParams.UNSET;
+        // 这里可根据原始布局设置合适的 top 约束
+        pdfListView.setLayoutParams(params);
+
+        searchView.setQuery("", false);
+        searchView.clearFocus();
+
+        // 恢复原始文件列表
+        pdfFiles = new ArrayList<>(allPdfFiles);
+        loadPDFs();
+
+        // 隐藏顶部栏的返回按钮
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            ActionBar actionBar = mainActivity.getSupportActionBar();
+            if (actionBar != null) {
+                actionBar.setDisplayHomeAsUpEnabled(false);
+            }
+        }
     }
 }
 
