@@ -3,6 +3,7 @@ package com.ruibang.pointmeasuretoolsv6;
 import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PointF;
@@ -22,7 +23,9 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SearchView;
 import android.widget.Spinner;
@@ -47,6 +50,7 @@ import androidx.fragment.app.Fragment;
 
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.ruibang.pointmeasuretoolsv6.databinding.FragmentFirstBinding;
 
 import org.json.JSONArray;
@@ -54,8 +58,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -63,7 +71,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.text.DecimalFormat;
-
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class FirstFragment extends Fragment implements GestureDetector.OnGestureListener, GestureDetector.OnDoubleTapListener {
@@ -74,6 +83,8 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
     private PDFView pdfView;
     private ListView pdfListView;
     private List<File> pdfFiles;
+    private static final int STORAGE_PERMISSION_REQUEST_CODE = 100;
+
     private static final int PERMISSION_REQUEST_CODE = 1;
     // 权限请求码
     private static final int REQUEST_CODE_READ_STORAGE = 100;
@@ -124,18 +135,23 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
 
         // 初始化搜索视图
         searchView = rootView.findViewById(R.id.searchView);
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) {
-                return false;
-            }
+        if (searchView != null) { // 添加空值检查
+            searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    return false;
+                }
 
-            @Override
-            public boolean onQueryTextChange(String newText) {
-                filterFiles(newText);
-                return true;
-            }
-        });
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    filterFiles(newText);
+                    return true;
+                }
+            });
+        }else{
+            Log.e("FirstFragment", "SearchView is null");
+            Toast.makeText(getContext(), "SearchView is null", Toast.LENGTH_SHORT).show();
+        }
 
         //检查权限
         checkReadStoragePermission();//读取外部存储权限
@@ -240,7 +256,6 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
                     parent.getChildAt(i).setBackgroundColor(Color.TRANSPARENT);
                 }
                 view.setBackgroundColor(Color.LTGRAY);
-
                 File selectedFile = pdfFiles.get(position);
                 showPDF(selectedFile);
             }
@@ -280,7 +295,26 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
                 Toast.makeText(requireContext(), "定位权限被拒绝", Toast.LENGTH_SHORT).show();
             }
         }
+        if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // 权限已授予，可以继续重命名操作
+            } else {
+                Toast.makeText(requireContext(), "存储权限被拒绝，无法重命名文件", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
+
+    private boolean checkStoragePermission() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    STORAGE_PERMISSION_REQUEST_CODE);
+            return false;
+        }
+        return true;
+    }
+
 
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
@@ -758,6 +792,28 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
         return super.onOptionsItemSelected(item);
     }
 
+    private void flashEditableList() {
+        // 加载PDF文件列表
+        pdfFiles = new ArrayList<>();
+        File externalStorageDirectory = Environment.getExternalStorageDirectory();
+        findPDFs(externalStorageDirectory);
+        // 刷新列表文件
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (File file : pdfFiles) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("pdfFileName", file.getName());
+            if (file.getName().endsWith(".pdf")) {
+                item.put("pdfIcon", R.drawable.ic_pdf);
+            } else {
+                item.put("pdfIcon", R.drawable.ic_document);
+            }
+            data.add(item);
+        }
+
+        // 使用自定义适配器
+        EditableFileAdapter adapter = new EditableFileAdapter(data);
+        pdfListView.setAdapter(adapter);
+    }
     private void enableEditMode() {
         // 隐藏搜索和编辑按钮
         if (getActivity() instanceof MainActivity) {
@@ -766,6 +822,25 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
             if (menu != null) {
                 mainActivity.setTopAppBarMenuVisibility(menu, false);
             }
+
+            BottomNavigationView bottomNavigationView = mainActivity.findViewById(R.id.bottomNavigationView);
+
+            // 设置重命名按钮的点击事件
+            bottomNavigationView.setOnNavigationItemSelectedListener(item -> {
+                if (item.getItemId() == R.id.rename) {
+                    handleRename();
+                    return true;
+                }else if (item.getItemId() == R.id.delete) {
+                    handleDelete();
+                    return true;
+                }else if (item.getItemId() == R.id.copy) {
+                    handleCopy();
+                    return true;
+                }
+                // 可以添加其他按钮的处理逻辑
+                return false;
+            });
+
         }
         // 显示返回按钮
         AppCompatActivity activity = (AppCompatActivity) getActivity();
@@ -793,10 +868,9 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
             }
             data.add(item);
         }
-        SimpleAdapter adapter = new SimpleAdapter(requireContext(), data,
-                R.layout.list_item_pdf_editable,
-                new String[]{"pdfIcon", "pdfFileName"},
-                new int[]{R.id.pdfIcon, R.id.pdfFileName});
+
+        // 使用自定义适配器
+        EditableFileAdapter adapter = new EditableFileAdapter(data);
         pdfListView.setAdapter(adapter);
 
         // 获取父布局
@@ -828,15 +902,115 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
             parentLayout.addView(selectAllTextView, 0);
         }
         // 替换底部导航栏按钮
-        // 这里需要修改底部导航栏的菜单文件
-        // 假设底部导航栏使用的是 bottom_nav_menu.xml
         // 可以动态替换菜单
         if (getActivity() instanceof MainActivity) {
             MainActivity mainActivity = (MainActivity) getActivity();
             mainActivity.replaceBottomNavigationMenu(R.menu.bottom_nav_menu_editable);
         }
+
+        pdfListView.setOnItemClickListener(new  AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                android.widget.CheckBox checkBox = view.findViewById(R.id.checkBox);
+                if (checkBox != null) {
+                    checkBox.setChecked(!checkBox.isChecked());
+                    updateBottomNavigationViewState();
+                }
+            }
+        });
     }
 
+    private void handleDelete() {
+        List<File> checkedFiles = getCheckedFiles();
+        if (checkedFiles.isEmpty()) {
+            Toast.makeText(requireContext(), "请选择要删除的文件", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("确认删除")
+                .setMessage("确定要删除选中的文件吗？")
+                .setPositiveButton("确定", (dialog, which) -> {
+                    for (File file : checkedFiles) {
+                        if (file.delete()) {
+                            pdfFiles.remove(file);
+                            Log.d("FirstFragment", "文件删除成功: " + file.getAbsolutePath());
+                        } else {
+                            Log.e("FirstFragment", "文件删除失败: " + file.getAbsolutePath());
+                        }
+                    }
+                    // 刷新文件列表
+                    flashEditableList();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+// ... 已有代码 ...
+
+
+
+    private void handleCopy() {
+        List<File> checkedFiles = getCheckedFiles();
+        if (checkedFiles.isEmpty()) {
+            Toast.makeText(requireContext(), "请选择要复制的文件", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        for (File sourceFile : checkedFiles) {
+            String originalName = sourceFile.getName();
+            String fileNameWithoutExtension = originalName;
+            String extension = "";
+            int dotIndex = originalName.lastIndexOf('.');
+            if (dotIndex != -1) {
+                fileNameWithoutExtension = originalName.substring(0, dotIndex);
+                extension = originalName.substring(dotIndex);
+            }
+
+            File parentDir = sourceFile.getParentFile();
+            int n = 1;
+            File destFile;
+            do {
+                String newName;
+                if (n == 1) {
+                    newName = fileNameWithoutExtension + "(1)" + extension;
+                } else {
+                    // 提取已有的 (n) 部分并替换
+                    Pattern pattern = Pattern.compile("\\(\\d+\\)$");
+                    Matcher matcher = pattern.matcher(fileNameWithoutExtension);
+                    if (matcher.find()) {
+                        fileNameWithoutExtension = fileNameWithoutExtension.replace(matcher.group(), "");
+                    }
+                    newName = fileNameWithoutExtension.trim() + "(" + n + ")" + extension;
+                }
+                destFile = new File(parentDir, newName);
+                n++;
+            } while (destFile.exists());
+
+            try {
+                copyFile(sourceFile, destFile);
+                pdfFiles.add(destFile);
+                Log.d("FirstFragment", "文件复制成功: " + sourceFile.getAbsolutePath() + " -> " + destFile.getAbsolutePath());
+            } catch (IOException e) {
+                Log.e("FirstFragment", "文件复制失败: " + sourceFile.getAbsolutePath(), e);
+                Toast.makeText(requireContext(), "文件复制失败: " + sourceFile.getName(), Toast.LENGTH_SHORT).show();
+            }
+        }
+        flashEditableList();
+        //loadPDFs();
+    }
+
+
+    private void copyFile(File source, File destination) throws IOException {
+        try (InputStream in = new FileInputStream(source);
+             OutputStream out = new FileOutputStream(destination)) {
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = in.read(buffer)) > 0) {
+                out.write(buffer, 0, length);
+            }
+        }
+    }
     private void disableEditMode() {
         // 隐藏返回按钮
         AppCompatActivity activity = (AppCompatActivity) getActivity();
@@ -850,6 +1024,10 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
         if (getActivity() instanceof MainActivity) {
             MainActivity mainActivity = (MainActivity) getActivity();
             mainActivity.replaceBottomNavigationMenu(R.menu.bottom_nav_menu);
+
+            BottomNavigationView bottomNavigationView = mainActivity.findViewById(R.id.bottomNavigationView);
+            bottomNavigationView.getMenu().setGroupCheckable(0, true, true);
+
         }
 
         // 恢复列表项布局
@@ -935,11 +1113,6 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
         // 显示搜索输入框
         searchView.setVisibility(View.VISIBLE);
 
-        // 调整 ListView 的布局参数，确保从搜索框下方开始
-        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) pdfListView.getLayoutParams();
-        params.topToBottom = R.id.searchView;
-        pdfListView.setLayoutParams(params);
-
         // 显示顶部栏的返回按钮
         if (getActivity() instanceof MainActivity) {
             MainActivity mainActivity = (MainActivity) getActivity();
@@ -953,13 +1126,6 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
     private void disableSearchMode() {
         // 隐藏搜索输入框
         searchView.setVisibility(View.GONE);
-
-        // 恢复 ListView 的布局参数
-        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) pdfListView.getLayoutParams();
-        params.topToBottom = ConstraintLayout.LayoutParams.UNSET;
-        // 这里可根据原始布局设置合适的 top 约束
-        pdfListView.setLayoutParams(params);
-
         searchView.setQuery("", false);
         searchView.clearFocus();
 
@@ -974,6 +1140,187 @@ public class FirstFragment extends Fragment implements GestureDetector.OnGesture
             if (actionBar != null) {
                 actionBar.setDisplayHomeAsUpEnabled(false);
             }
+        }
+    }
+
+    private void updateBottomNavigationViewState() {
+        if (getActivity() instanceof MainActivity) {
+            MainActivity mainActivity = (MainActivity) getActivity();
+            BottomNavigationView bottomNavigationView = mainActivity.findViewById(R.id.bottomNavigationView);
+
+            // 清除默认选中项
+            bottomNavigationView.getMenu().setGroupCheckable(0, false, true);
+            bottomNavigationView.setSelectedItemId(-1);
+
+            // 统计勾选的文件数量
+            int checkedCount = 0;
+            for (int i = 0; i < pdfListView.getChildCount(); i++) {
+                android.widget.CheckBox checkBox = pdfListView.getChildAt(i).findViewById(R.id.checkBox);
+                if (checkBox != null && checkBox.isChecked()) {
+                    checkedCount++;
+                }
+            }
+
+            // 获取底部导航栏的菜单项
+            MenuItem renameItem = bottomNavigationView.getMenu().findItem(R.id.rename);
+            MenuItem deleteItem = bottomNavigationView.getMenu().findItem(R.id.delete);
+            MenuItem copyItem = bottomNavigationView.getMenu().findItem(R.id.copy);
+            MenuItem uploadItem = bottomNavigationView.getMenu().findItem(R.id.upload);
+
+            // 根据勾选数量启用或禁用菜单项
+            if (checkedCount == 0) {
+                renameItem.setEnabled(false);
+                deleteItem.setEnabled(false);
+                copyItem.setEnabled(false);
+                uploadItem.setEnabled(false);
+            } else if (checkedCount == 1) {
+                renameItem.setEnabled(true);
+                deleteItem.setEnabled(true);
+                copyItem.setEnabled(true);
+                uploadItem.setEnabled(true);
+            } else {
+                renameItem.setEnabled(false);
+                deleteItem.setEnabled(true);
+                copyItem.setEnabled(true);
+                uploadItem.setEnabled(true);
+            }
+        }
+    }
+
+    private void handleRename() {
+        List<File> checkedFiles = getCheckedFiles();
+        if (checkedFiles.size() == 1) {
+            File fileToRename = checkedFiles.get(0);
+            showRenameDialog(fileToRename);
+        }
+    }
+
+    private List<File> getCheckedFiles() {
+        List<File> checkedFiles = new ArrayList<>();
+        for (int i = 0; i < pdfListView.getChildCount(); i++) {
+            CheckBox checkBox = pdfListView.getChildAt(i).findViewById(R.id.checkBox);
+            if (checkBox != null && checkBox.isChecked()) {
+                checkedFiles.add(pdfFiles.get(i));
+            }
+        }
+        return checkedFiles;
+    }
+
+    private void showRenameDialog(File fileToRename) {
+        if (!checkStoragePermission()) {
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("重命名文件");
+
+        // 创建输入框
+        final EditText input = new EditText(requireContext());
+        input.setText(fileToRename.getName());
+        builder.setView(input);
+
+        // 设置确定和取消按钮
+        builder.setPositiveButton("确定", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String newName = input.getText().toString().trim();
+                if (!newName.isEmpty()) {
+                    File parentDir = fileToRename.getParentFile();
+                    File newFile = new File(parentDir, newName);
+                    if (newFile.exists()) {
+                        android.widget.Toast.makeText(requireContext(), "该文件名已存在，请重新输入", android.widget.Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (fileToRename.renameTo(newFile)) {
+                        Log.d("FirstFragment", "文件重命名成功");
+                        Toast.makeText(requireContext(), "文件重命名成功", Toast.LENGTH_SHORT).show();
+                        // 重命名成功，更新文件列表
+                        pdfFiles.remove(fileToRename);
+                        pdfFiles.add(newFile);
+                        loadPDFs();
+                    } else {
+                        // 重命名失败，提示用户
+                        android.widget.Toast.makeText(requireContext(), "重命名失败", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        });
+        builder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+    }
+    private class EditableFileAdapter extends BaseAdapter {
+        private List<Map<String, Object>> data;
+
+        // 在 EditableFileAdapter 类中添加一个列表来保存 CheckBox 的状态
+        private List<Boolean> checkBoxStates;
+
+        public EditableFileAdapter(List<Map<String, Object>> data) {
+            this.data = data;
+            checkBoxStates = new ArrayList<>();
+            for (int i = 0; i < data.size(); i++) {
+                checkBoxStates.add(false);
+            }
+        }
+
+        @Override
+        public int getCount() {
+            return data.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return data.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            ViewHolder holder;
+            if (convertView == null) {
+                convertView = getLayoutInflater().inflate(R.layout.list_item_pdf_editable, parent, false);
+                holder = new ViewHolder();
+                holder.checkBox = convertView.findViewById(R.id.checkBox);
+                holder.pdfIcon = convertView.findViewById(R.id.pdfIcon);
+                holder.pdfFileName = convertView.findViewById(R.id.pdfFileName);
+                convertView.setTag(holder);
+            } else {
+                holder = (ViewHolder) convertView.getTag();
+            }
+
+            Map<String, Object> item = data.get(position);
+            holder.pdfIcon.setImageResource((int) item.get("pdfIcon"));
+            holder.pdfFileName.setText((String) item.get("pdfFileName"));
+
+            holder.checkBox.setChecked(checkBoxStates.get(position));
+
+            // 给 CheckBox 设置点击监听器
+            holder.checkBox.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    checkBoxStates.set(position, holder.checkBox.isChecked());
+                    if (isEditing) {
+                        updateBottomNavigationViewState();
+                    }
+                }
+            });
+
+            return convertView;
+        }
+
+        private class ViewHolder {
+            CheckBox checkBox;
+            ImageView pdfIcon;
+            TextView pdfFileName;
         }
     }
 }
@@ -1024,3 +1371,4 @@ class PointInfo {
 
 
 }
+
